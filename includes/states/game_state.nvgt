@@ -1,0 +1,107 @@
+#include "form.nvgt"
+#include "speech.nvgt"
+#include "../state.nvgt"
+#include "../context.nvgt"
+#include "../ui/dialogs.nvgt"
+
+// Renamed the delegate to avoid conflict
+funcdef int on_slider_event_callback(audio_form@ form, int control_type, control_event_type type, dictionary@ args);
+
+class GameState : state {
+    int computerGuess; // Keep track of the number of the computer
+    int playerGuess; // What number did the player guess?
+    audio_form form;
+    int btnExit, statusBar, btnSubmit, value, tries;
+
+    GameState(game_context@ ctx, audio_form@ form) {
+        super(ctx);
+        this.computerGuess = 0;
+        this.playerGuess = 0;
+        this.form = form; // Initialize the form for UI elements
+        this.btnExit = 0;
+        this.btnSubmit = 0;
+        this.value = 0;
+        this.tries = 3;
+        this.statusBar = 0;
+    }
+
+    void on_push() {
+        this.computerGuess = random(1, 10);
+        this.form.create_window();
+        this.value = this.form.create_slider("Select A value", 1, 1, 10, "numeric value");
+        this.btnSubmit = this.form.create_button("Submit");
+        this.btnExit = this.form.create_button("Quit to main menu");
+        this.statusBar = this.form.create_status_bar("Tries remaining", this.tries);
+        
+        speak("Please pick a random number from 1 to 10.");
+        
+        // Set the event callback using the renamed delegate
+        this.form.set_event_callback(this.value, on_control_event_callback(onSliderChanged));
+    }
+
+    void on_update() {
+        this.form.monitor();
+        if (this.form.is_pressed(this.btnExit)) {
+            this.context.state_machine.pop();
+        }
+        if (this.form.is_pressed(this.btnSubmit)) {
+            evaluate(this.playerGuess);
+        }
+        if (this.tries == 0) {
+            this.context.state_machine.pop();
+            this.context.state_machine.push(SingleLineDialog(this.context, "You ran out of tries. The computer guessed " + this.computerGuess + " and you guessed " + this.playerGuess));
+        }
+
+    }
+
+    void on_pop() {
+        this.form.reset(); // Clear the form just in case
+    }
+
+    void evaluate(int number) {
+        // Check if the number is out of range
+        if (number > 10 || number < 1) {
+            //throw ("Number out of range");
+            number=1;
+        }
+
+        // Compare the player's guess with the computer's number
+        if (number == this.computerGuess) {
+            // If the guess is correct, congratulate the player
+            string message = "You did it! The computer guessed " + this.computerGuess + " and you guessed " + this.playerGuess;
+            this.context.state_machine.pop();
+            this.context.state_machine.push(SingleLineDialog(this.context, message));
+        } else {
+            // Decrease the number of tries since the guess is wrong
+            this.tries -= 1;
+            this.form.set_text(this.statusBar, this.tries); // Update the UI with remaining tries
+
+            // Check if the player ran out of tries
+            if (this.tries == 0) {
+                string message = "You ran out of tries. The computer guessed " + this.computerGuess + " and you guessed " + this.playerGuess;
+                this.context.state_machine.pop();
+                this.context.state_machine.push(SingleLineDialog(this.context, message));
+            } else {
+                // Provide feedback on whether the guess was too high or too low
+                if (number > this.computerGuess) {
+                    speak("Number too high. Try again.");
+                } else if (number < this.computerGuess) {
+                    speak("Number too low. Try again.");
+                }
+            }
+        }
+    }
+
+
+    // Callback function must match the expected signature
+    int onSliderChanged(audio_form@ form, int control_type, control_event_type type, dictionary@ args) {
+        if (type == event_slider) {
+            this.context.soundPool.play_stationary("snd/click.wav",false);
+            this.playerGuess = this.form.get_slider(this.value);
+            if (this.playerGuess <1) {
+                this.playerGuess=1;
+            }
+        }
+        return 0;
+    }
+}

@@ -1,0 +1,11 @@
+#include"sound_pool.nvgt"
+#include "state.nvgt"
+
+class game_context {
+    state_manager@ state_machine; //A global instance of the state manager that you can use in your states.
+    sound_pool soundPool; //A global instance of the sound pool
+    game_context() {
+        @this.state_machine=state_manager();
+        this.soundPool=sound_pool();
+    }
+}

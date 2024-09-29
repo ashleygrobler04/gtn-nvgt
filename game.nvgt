@@ -1,0 +1,29 @@
+#include "form.nvgt"
+#include "includes/states/game_state.nvgt"
+#include "includes/ui/menu.nvgt"
+#include "includes/state.nvgt"
+#include "includes/context.nvgt"
+
+void main() {
+    show_window("Guess the number!");
+    game_context context;
+    Menu menu(context, "Main menu");
+    menu.add_item(MenuItem("Start game", onStart));
+    menu.add_item(MenuItem("Exit game", onExit));
+    context.state_machine.push(menu);
+    while (true) {
+        wait(5);
+        context.state_machine.update();
+    }
+}
+
+void onExit(game_context@ context) {
+    exit();
+}
+
+void onStart(game_context@ context) {
+    //alert("Information", "This option is not added as of yet");
+    audio_form f;
+    context.state_machine.push(GameState(context, f));
+}
+

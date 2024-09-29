@@ -1,0 +1,109 @@
+#include "speech.nvgt"
+#include "../state.nvgt"
+#include "../context.nvgt"
+
+class SingleLineDialog:state {
+    string message; //The message to be spoken
+    SingleLineDialog(game_context@ ctx, string message) {
+        super(ctx);
+        this.message=message;
+    }
+
+    void on_update() {
+        if (key_pressed(KEY_LEFT) || key_pressed(KEY_RIGHT) || key_pressed(KEY_UP) || key_pressed(KEY_DOWN)) {
+            speak(message);
+        }
+        if (key_pressed(KEY_RETURN) || key_pressed(KEY_ESCAPE)) {
+            this.context.state_machine.pop(); //We pop once the dialog is done.
+        }
+    }
+
+    void on_push() {
+        speak(this.message);
+    }
+}
+
+class MultiLineDialog:state {
+    string[] messages; //A list of messages.
+    int index; //Keep track of the line the user is at in the dialog
+    MultiLineDialog(game_context@ ctx, string[] messages) {
+        super(ctx);
+        this.messages=messages;
+        this.index=0;
+    }
+
+    void on_update() {
+        if (key_pressed(KEY_RETURN) || key_pressed(KEY_ESCAPE)) {
+            this.context.state_machine.pop();
+        }
+        if (key_pressed(KEY_LEFT) || key_pressed(KEY_RIGHT)) {
+            speak(this.messages[this.index]);
+        }
+        if (key_pressed(KEY_UP) and this.index>0) {
+            this.index-=1;
+            speak(this.messages[this.index]);
+        }
+        if (key_pressed(KEY_DOWN) and this.index<=this.messages.length()-1) {
+            speak(this.messages[this.index]);
+            this.index+=1;
+        }
+    }
+
+    void on_push() {
+        string spokenMessage=join(this.messages," "); //We want to speak all the messages when the dialog displays.
+        speak(spokenMessage);
+    }
+}
+
+class AudioDialog:state {
+    sound s; //The sound we would like to play
+    bool shouldFade; //Do we want to fade out the audio when the user press enter or not?
+    bool canSkip; //Can the user skip the sound with the enter key?
+    int fadeTime;
+    timer fadeTimer;
+    AudioDialog(game_context@ ctx, string soundPath, bool shouldFade=false, bool canSkip=false) {
+        super(ctx);
+        this.fadeTime=100;
+        this.shouldFade=shouldFade;
+        this.s.load(soundPath);
+        this.canSkip=canSkip;
+    }
+
+    void on_push() {
+        this.s.play();
+    }
+
+    void on_update() {
+        if (key_pressed(KEY_RETURN) and this.canSkip) {
+            if (!this.shouldFade) {
+                this.s.stop();
+                this                .s.close();
+                this.context.state_machine.pop();
+            } else if (this.shouldFade) {
+                this.fadeTimer.restart();
+                while (this.s.playing) {
+                    if (this.fadeTimer.elapsed >= this.fadeTime) {
+                        this.s.volume -= 1; 
+                        this.fadeTimer.restart(); 
+                        if (this.s.volume <= -50) {
+                            this.s.stop();
+                            this.s.close();
+                            this.context.state_machine.pop();
+                            //break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!this.s.playing && this.s.loaded_filename != "") {
+            this.context.state_machine.pop();
+        }
+    }
+
+    void on_pop() {
+        if (this.s.volume!=0) {
+            this.s.volume=0;
+        }
+    }
+}

@@ -1,0 +1,82 @@
+#include "../state.nvgt"
+#include "../context.nvgt"
+#include "speech.nvgt"
+funcdef void select_callback(game_context@ context); //when A menu item has been selected
+
+class MenuItem {
+    string text; //will be used to speak the option the user is focused on
+    select_callback@ callback;
+string usageHint; //Will be spoken after A set duration
+    MenuItem(string text,select_callback@ callback,string hintText="press up and down to navigate and press enter to select.") {
+        this.text=text;
+        @this.callback=callback;
+        this.usageHint=hintText;
+    }
+}
+
+class Menu:state {
+    MenuItem@[] items;
+    int index;
+    int focusTime; //We use this to set when exactly the usage hint has to be spoken
+    string title;
+    timer usageHintTimer; //We speak the usage hint with this timer
+    bool focusIdle; //keep track of when the user focus is idle in the menu
+    Menu(game_context@ context, string title) {
+        super(context);
+        this.title=title;
+        this.focusTime=1000;
+        this.focusIdle=false;
+    }
+
+    void cycle(int dir) {
+        if (dir==-1) {
+            this.index-=1;
+            speak(this.items[this.index].text);
+        }
+        else if (dir==1 ) {
+            this.index+=1;
+            speak(this.items[this.index].text);
+        }
+        this.focusIdle=false;
+        this.usageHintTimer.restart();
+    }
+
+    void add_item(MenuItem@ item) {
+        this.items.insert_last(item);
+    }
+
+    void on_push() {
+        speak(this.title);
+    }
+
+    void on_pop() {
+        state::on_pop();
+    }
+
+    void on_update(){
+        if (this.focusIdle and this.usageHintTimer.elapsed>=this.focusTime) {
+            speak(this.items[this.index].usageHint);
+            this.focusIdle=false;
+        }
+        if (key_pressed(KEY_UP) and this.index>0) {
+            this.cycle(-1);
+            this.focusIdle=true;
+        }
+        if (key_pressed(KEY_DOWN) and this.index<this.items.length()-1) {
+            cycle(1);
+            this.focusIdle=true;
+        }
+        if (key_pressed(KEY_RETURN)) {
+            this.items[this.index].callback(context);
+        }
+
+        if (key_pressed(KEY_ESCAPE)) {
+            if (context.state_machine.stack.length()>1) {
+                context.state_machine.pop();
+            }
+            else {
+                exit();
+            }
+        }
+    }
+}

@@ -1,0 +1,43 @@
+// Define a function signature for event handlers
+funcdef void EventHandler(dictionary@ data);
+
+// EventManager class
+class EventManager {
+    dictionary events; // Tracks all events.
+    
+    // Constructor
+    EventManager() {
+        // Initialize an empty dictionary for events
+        this.events = dictionary();
+    }
+
+    // Register an event handler for a specific event
+    void registerEvent(const string &in eventName, EventHandler@ handler) {
+        if (!events.exists(eventName)) {
+            array<EventHandler@> handlers; // Create an array of handlers
+            events[eventName] = handlers;  // Store it in the dictionary
+        }
+        array<EventHandler@>@ handlers;
+        events.get(eventName, @handlers);
+        handlers.insert_last(handler); // Add the new handler
+    }
+
+    // Trigger an event by its name
+    void triggerEvent(const string &in eventName, dictionary@ data) {
+        if (events.exists(eventName)) {
+            array<EventHandler@>@ handlers;
+            events.get(eventName, @handlers);
+            // Call all registered handlers for this event
+            for (uint i = 0; i < handlers.length(); i++) {
+                handlers[i](data); // Call the handler function
+            }
+        }
+    }
+
+    // Clear all handlers for an event
+    void clearEvent(const string &in eventName) {
+        if (events.exists(eventName)) {
+            events.delete(eventName); // Remove all handlers
+        }
+    }
+}
